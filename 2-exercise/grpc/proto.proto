@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+option go_package = "9-week/grpc/proto";
+
+message RequestMessage {
+  uint64 clientID = 1;
+  uint64 time = 2;
+}
+
+message JoinMessage {
+  uint64 clientID = 1;
+  string port = 2;
+}
+
+message Reply {
+  bool success = 1;
+  uint64 time = 2;
+}
+
+message Empty{}
+
+service Mutex2 {
+  rpc Join(JoinMessage) returns (Empty);
+  rpc Request(RequestMessage) returns (Reply);
+}
