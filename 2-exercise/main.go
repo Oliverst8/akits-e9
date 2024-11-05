@@ -194,7 +194,7 @@ func (s MutexNode) RespondToRequest(context context.Context, reply *proto.Reply)
 	fmt.Println("Got goahead")
 	responsesLock.Lock()
 	s.responses = 1 + s.responses
-	fmt.Printf("Increased responses, new response: %s \n", s.responses)
+	fmt.Printf("Increased responses, new response: %d \n", s.responses)
 	responsesLock.Unlock()
 	return &proto.Empty{}, nil
 }
