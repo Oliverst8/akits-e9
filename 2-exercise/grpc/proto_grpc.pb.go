@@ -19,139 +19,177 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Mutex2_Join_FullMethodName    = "/Mutex2/Join"
-	Mutex2_Request_FullMethodName = "/Mutex2/Request"
+	MutexNode_Join_FullMethodName    = "/MutexNode/Join"
+	MutexNode_Request_FullMethodName = "/MutexNode/Request"
+	MutexNode_AddNode_FullMethodName = "/MutexNode/AddNode"
 )
 
-// Mutex2Client is the client API for Mutex2 service.
+// MutexNodeClient is the client API for MutexNode service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type Mutex2Client interface {
-	Join(ctx context.Context, in *JoinMessage, opts ...grpc.CallOption) (*Empty, error)
+type MutexNodeClient interface {
+	Join(ctx context.Context, in *JoinMessage, opts ...grpc.CallOption) (*JoinResponse, error)
 	Request(ctx context.Context, in *RequestMessage, opts ...grpc.CallOption) (*Reply, error)
+	AddNode(ctx context.Context, in *JoinMessage, opts ...grpc.CallOption) (*JoinMessage, error)
 }
 
-type mutex2Client struct {
+type mutexNodeClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewMutex2Client(cc grpc.ClientConnInterface) Mutex2Client {
-	return &mutex2Client{cc}
+func NewMutexNodeClient(cc grpc.ClientConnInterface) MutexNodeClient {
+	return &mutexNodeClient{cc}
 }
 
-func (c *mutex2Client) Join(ctx context.Context, in *JoinMessage, opts ...grpc.CallOption) (*Empty, error) {
+func (c *mutexNodeClient) Join(ctx context.Context, in *JoinMessage, opts ...grpc.CallOption) (*JoinResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
-	err := c.cc.Invoke(ctx, Mutex2_Join_FullMethodName, in, out, cOpts...)
+	out := new(JoinResponse)
+	err := c.cc.Invoke(ctx, MutexNode_Join_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *mutex2Client) Request(ctx context.Context, in *RequestMessage, opts ...grpc.CallOption) (*Reply, error) {
+func (c *mutexNodeClient) Request(ctx context.Context, in *RequestMessage, opts ...grpc.CallOption) (*Reply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Reply)
-	err := c.cc.Invoke(ctx, Mutex2_Request_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, MutexNode_Request_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// Mutex2Server is the server API for Mutex2 service.
-// All implementations must embed UnimplementedMutex2Server
-// for forward compatibility.
-type Mutex2Server interface {
-	Join(context.Context, *JoinMessage) (*Empty, error)
-	Request(context.Context, *RequestMessage) (*Reply, error)
-	mustEmbedUnimplementedMutex2Server()
+func (c *mutexNodeClient) AddNode(ctx context.Context, in *JoinMessage, opts ...grpc.CallOption) (*JoinMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JoinMessage)
+	err := c.cc.Invoke(ctx, MutexNode_AddNode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
-// UnimplementedMutex2Server must be embedded to have
+// MutexNodeServer is the server API for MutexNode service.
+// All implementations must embed UnimplementedMutexNodeServer
+// for forward compatibility.
+type MutexNodeServer interface {
+	Join(context.Context, *JoinMessage) (*JoinResponse, error)
+	Request(context.Context, *RequestMessage) (*Reply, error)
+	AddNode(context.Context, *JoinMessage) (*JoinMessage, error)
+	mustEmbedUnimplementedMutexNodeServer()
+}
+
+// UnimplementedMutexNodeServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedMutex2Server struct{}
+type UnimplementedMutexNodeServer struct{}
 
-func (UnimplementedMutex2Server) Join(context.Context, *JoinMessage) (*Empty, error) {
+func (UnimplementedMutexNodeServer) Join(context.Context, *JoinMessage) (*JoinResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Join not implemented")
 }
-func (UnimplementedMutex2Server) Request(context.Context, *RequestMessage) (*Reply, error) {
+func (UnimplementedMutexNodeServer) Request(context.Context, *RequestMessage) (*Reply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Request not implemented")
 }
-func (UnimplementedMutex2Server) mustEmbedUnimplementedMutex2Server() {}
-func (UnimplementedMutex2Server) testEmbeddedByValue()                {}
+func (UnimplementedMutexNodeServer) AddNode(context.Context, *JoinMessage) (*JoinMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddNode not implemented")
+}
+func (UnimplementedMutexNodeServer) mustEmbedUnimplementedMutexNodeServer() {}
+func (UnimplementedMutexNodeServer) testEmbeddedByValue()                   {}
 
-// UnsafeMutex2Server may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to Mutex2Server will
+// UnsafeMutexNodeServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to MutexNodeServer will
 // result in compilation errors.
-type UnsafeMutex2Server interface {
-	mustEmbedUnimplementedMutex2Server()
+type UnsafeMutexNodeServer interface {
+	mustEmbedUnimplementedMutexNodeServer()
 }
 
-func RegisterMutex2Server(s grpc.ServiceRegistrar, srv Mutex2Server) {
-	// If the following call pancis, it indicates UnimplementedMutex2Server was
+func RegisterMutexNodeServer(s grpc.ServiceRegistrar, srv MutexNodeServer) {
+	// If the following call pancis, it indicates UnimplementedMutexNodeServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&Mutex2_ServiceDesc, srv)
+	s.RegisterService(&MutexNode_ServiceDesc, srv)
 }
 
-func _Mutex2_Join_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MutexNode_Join_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(JoinMessage)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(Mutex2Server).Join(ctx, in)
+		return srv.(MutexNodeServer).Join(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Mutex2_Join_FullMethodName,
+		FullMethod: MutexNode_Join_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(Mutex2Server).Join(ctx, req.(*JoinMessage))
+		return srv.(MutexNodeServer).Join(ctx, req.(*JoinMessage))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Mutex2_Request_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MutexNode_Request_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RequestMessage)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(Mutex2Server).Request(ctx, in)
+		return srv.(MutexNodeServer).Request(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Mutex2_Request_FullMethodName,
+		FullMethod: MutexNode_Request_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(Mutex2Server).Request(ctx, req.(*RequestMessage))
+		return srv.(MutexNodeServer).Request(ctx, req.(*RequestMessage))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// Mutex2_ServiceDesc is the grpc.ServiceDesc for Mutex2 service.
+func _MutexNode_AddNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(JoinMessage)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MutexNodeServer).AddNode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MutexNode_AddNode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MutexNodeServer).AddNode(ctx, req.(*JoinMessage))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// MutexNode_ServiceDesc is the grpc.ServiceDesc for MutexNode service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var Mutex2_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "Mutex2",
-	HandlerType: (*Mutex2Server)(nil),
+var MutexNode_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "MutexNode",
+	HandlerType: (*MutexNodeServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "Join",
-			Handler:    _Mutex2_Join_Handler,
+			Handler:    _MutexNode_Join_Handler,
 		},
 		{
 			MethodName: "Request",
-			Handler:    _Mutex2_Request_Handler,
+			Handler:    _MutexNode_Request_Handler,
+		},
+		{
+			MethodName: "AddNode",
+			Handler:    _MutexNode_AddNode_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
