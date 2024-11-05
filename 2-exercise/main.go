@@ -7,10 +7,12 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	proto "main/grpc"
+	"math/rand/v2"
 	"net"
 	"os"
 	"strconv"
 	"sync"
+	"time"
 )
 
 // MutexNode Each node has a server to receive information and a list of clients to send information to all other nodes
@@ -28,16 +30,23 @@ var responsesLock sync.Mutex
 var reqeustLock sync.Mutex
 
 func main() {
-	clientPort := os.Args[2] //The port of this node
-	desiredNetworkSize, err := strconv.Atoi(os.Args[1])
+	clientPort := os.Args[2]                            //The port of this node
+	desiredNetworkSize, err := strconv.Atoi(os.Args[1]) //the desired size of the network
 	if err != nil {
 		panic(err)
 	}
-	node := &MutexNode{}
+	node := &MutexNode{
+		port:        clientPort,
+		clients:     make(map[string]proto.MutexNodeClient),
+		state:       "RELEASED",
+		myRequests:  make([]proto.MutexNodeClient, 0),
+		lamportTime: 0,
+		responses:   0,
+	}
 
-	node.start_server(clientPort) //Starting a server so that this node listen on the given port
-
-	if len(os.Args) > 3 { //If the client isnt the starting node
+	go node.start_server(clientPort) //Starting a server so that this node listen on the given port
+	fmt.Printf("Node listening on port %s\n", clientPort)
+	if len(os.Args) > 3 { //If the client isn't the starting node
 
 		joinOn := os.Args[3] //The port to send the join request to
 
@@ -63,9 +72,21 @@ func main() {
 		}
 
 	}
-	for len(node.clients) < desiredNetworkSize {
+	fmt.Println("Waiting for network to reach the desired size...")
+	prev := len(node.clients)
+	fmt.Printf("%d\n", prev)
+	for len(node.clients) < desiredNetworkSize-1 {
+		// print only when changed
+		length := len(node.clients)
+		if length != prev {
+			fmt.Println(length)
+			prev = length
+		}
+
 	}
-	node.state = "RELEASED"
+	time.Sleep(2 * time.Second)
+	num := rand.Float32()
+	fmt.Println("Desired network size reached starting main sequence...")
 	for {
 		if node.state == "RELEASED" {
 			reqeustLock.Lock()
@@ -81,6 +102,11 @@ func main() {
 			}
 			reqeustLock.Unlock()
 		}
+		if num < 0.01 {
+			fmt.Println("Start multicast...")
+			node.multicast()
+		}
+		num = rand.Float32()
 	}
 }
 
@@ -118,6 +144,11 @@ func (s MutexNode) Join(context context.Context, message *proto.JoinMessage) (*p
 		}
 		ports = append(ports, res.Port)
 	}
+	res, err := s.AddNode(context, message)
+	if err != nil {
+		return nil, err
+	}
+	ports = append(ports, res.Port)
 	reply := proto.JoinResponse{
 		Ports:   ports,
 		Success: true,
@@ -137,13 +168,20 @@ func (s MutexNode) AddNode(context context.Context, message *proto.JoinMessage) 
 
 func (s MutexNode) Request(context context.Context, message *proto.RequestMessage) (*proto.Empty, error) {
 	requestingClient := s.clients[message.Port]
+	if requestingClient == nil {
+		fmt.Println(s.clients)
+		fmt.Printf("The port is %s for the nil client\n", message.Port)
+	}
+	fmt.Printf("Got request, my state is: %s\n", s.state)
 	if s.state == "HELD" || (s.state == "WANTED" && s.compare(message)) {
+		fmt.Printf("Added to request to list, my port is:%s\n", s.port)
 		s.myRequests = append(s.myRequests, requestingClient)
 	} else {
 		reply := proto.Reply{
 			Success: true,
 			Time:    s.lamportTime,
 		}
+		fmt.Println("Giving go ahead to request")
 		_, err := requestingClient.RespondToRequest(context, &reply)
 		if err != nil {
 			panic(err)
@@ -153,8 +191,10 @@ func (s MutexNode) Request(context context.Context, message *proto.RequestMessag
 }
 
 func (s MutexNode) RespondToRequest(context context.Context, reply *proto.Reply) (*proto.Empty, error) {
+	fmt.Println("Got goahead")
 	responsesLock.Lock()
-	s.responses += 1
+	s.responses = 1 + s.responses
+	fmt.Printf("Increased responses, new response: %s \n", s.responses)
 	responsesLock.Unlock()
 	return &proto.Empty{}, nil
 }
@@ -168,20 +208,26 @@ func (s MutexNode) compare(message *proto.RequestMessage) bool {
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println("Entered compare")
 	if s.lamportTime < message.Time {
 		return true
 	}
 	if s.lamportTime == message.Time && thisPort < thatPort {
+		fmt.Printf("My port is smaller\n\t- My Port: %d\n\t- Their Port:%d", thisPort, thatPort)
 		return true
 	}
 	return false
 }
 
-func (s MutexNode) multicast(message *proto.RequestMessage) {
+func (s MutexNode) multicast() {
 	s.state = "WANTED"
 	s.responses = 0
 	for _, client := range s.clients {
-		go makeRequest(client, message)
+		message := proto.RequestMessage{
+			Port: s.port,
+			Time: s.lamportTime,
+		}
+		go makeRequest(client, &message)
 	}
 	for {
 		if s.responses >= len(s.clients) {
@@ -189,6 +235,7 @@ func (s MutexNode) multicast(message *proto.RequestMessage) {
 		}
 	}
 	s.state = "HELD"
+	fmt.Println("ACCESING FILE...")
 	incrementFile()
 	s.state = "RELEASED"
 }
@@ -205,7 +252,12 @@ func incrementFile() {
 			panic(err)
 		}
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(file)
 
 	scanner := bufio.NewScanner(file)
 	text := "0"
