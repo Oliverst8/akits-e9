@@ -19,9 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	MutexNode_Join_FullMethodName    = "/MutexNode/Join"
-	MutexNode_Request_FullMethodName = "/MutexNode/Request"
-	MutexNode_AddNode_FullMethodName = "/MutexNode/AddNode"
+	MutexNode_Join_FullMethodName             = "/MutexNode/Join"
+	MutexNode_Request_FullMethodName          = "/MutexNode/Request"
+	MutexNode_RespondToRequest_FullMethodName = "/MutexNode/RespondToRequest"
+	MutexNode_AddNode_FullMethodName          = "/MutexNode/AddNode"
 )
 
 // MutexNodeClient is the client API for MutexNode service.
@@ -29,7 +30,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type MutexNodeClient interface {
 	Join(ctx context.Context, in *JoinMessage, opts ...grpc.CallOption) (*JoinResponse, error)
-	Request(ctx context.Context, in *RequestMessage, opts ...grpc.CallOption) (*Reply, error)
+	Request(ctx context.Context, in *RequestMessage, opts ...grpc.CallOption) (*Empty, error)
+	RespondToRequest(ctx context.Context, in *Reply, opts ...grpc.CallOption) (*Empty, error)
 	AddNode(ctx context.Context, in *JoinMessage, opts ...grpc.CallOption) (*JoinMessage, error)
 }
 
@@ -51,10 +53,20 @@ func (c *mutexNodeClient) Join(ctx context.Context, in *JoinMessage, opts ...grp
 	return out, nil
 }
 
-func (c *mutexNodeClient) Request(ctx context.Context, in *RequestMessage, opts ...grpc.CallOption) (*Reply, error) {
+func (c *mutexNodeClient) Request(ctx context.Context, in *RequestMessage, opts ...grpc.CallOption) (*Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Reply)
+	out := new(Empty)
 	err := c.cc.Invoke(ctx, MutexNode_Request_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mutexNodeClient) RespondToRequest(ctx context.Context, in *Reply, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, MutexNode_RespondToRequest_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +88,8 @@ func (c *mutexNodeClient) AddNode(ctx context.Context, in *JoinMessage, opts ...
 // for forward compatibility.
 type MutexNodeServer interface {
 	Join(context.Context, *JoinMessage) (*JoinResponse, error)
-	Request(context.Context, *RequestMessage) (*Reply, error)
+	Request(context.Context, *RequestMessage) (*Empty, error)
+	RespondToRequest(context.Context, *Reply) (*Empty, error)
 	AddNode(context.Context, *JoinMessage) (*JoinMessage, error)
 	mustEmbedUnimplementedMutexNodeServer()
 }
@@ -91,8 +104,11 @@ type UnimplementedMutexNodeServer struct{}
 func (UnimplementedMutexNodeServer) Join(context.Context, *JoinMessage) (*JoinResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Join not implemented")
 }
-func (UnimplementedMutexNodeServer) Request(context.Context, *RequestMessage) (*Reply, error) {
+func (UnimplementedMutexNodeServer) Request(context.Context, *RequestMessage) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Request not implemented")
+}
+func (UnimplementedMutexNodeServer) RespondToRequest(context.Context, *Reply) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RespondToRequest not implemented")
 }
 func (UnimplementedMutexNodeServer) AddNode(context.Context, *JoinMessage) (*JoinMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddNode not implemented")
@@ -154,6 +170,24 @@ func _MutexNode_Request_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MutexNode_RespondToRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Reply)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MutexNodeServer).RespondToRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MutexNode_RespondToRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MutexNodeServer).RespondToRequest(ctx, req.(*Reply))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _MutexNode_AddNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(JoinMessage)
 	if err := dec(in); err != nil {
@@ -186,6 +220,10 @@ var MutexNode_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Request",
 			Handler:    _MutexNode_Request_Handler,
+		},
+		{
+			MethodName: "RespondToRequest",
+			Handler:    _MutexNode_RespondToRequest_Handler,
 		},
 		{
 			MethodName: "AddNode",
