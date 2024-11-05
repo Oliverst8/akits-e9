@@ -23,11 +23,11 @@ type MutexNode struct {
 	state       string
 	myRequests  []proto.MutexNodeClient
 	lamportTime uint64
-	responses   int
 }
 
 var responsesLock sync.Mutex
 var reqeustLock sync.Mutex
+var responses int
 
 func main() {
 	clientPort := os.Args[2]                            //The port of this node
@@ -41,7 +41,6 @@ func main() {
 		state:       "RELEASED",
 		myRequests:  make([]proto.MutexNodeClient, 0),
 		lamportTime: 0,
-		responses:   0,
 	}
 
 	go node.start_server(clientPort) //Starting a server so that this node listen on the given port
@@ -193,8 +192,8 @@ func (s MutexNode) Request(context context.Context, message *proto.RequestMessag
 func (s MutexNode) RespondToRequest(context context.Context, reply *proto.Reply) (*proto.Empty, error) {
 	fmt.Println("Got goahead")
 	responsesLock.Lock()
-	s.responses = 1 + s.responses
-	fmt.Printf("Increased responses, new response: %d \n", s.responses)
+	responses = 1 + responses
+	fmt.Printf("Increased responses, new response: %d \n", responses)
 	responsesLock.Unlock()
 	return &proto.Empty{}, nil
 }
@@ -220,8 +219,8 @@ func (s MutexNode) compare(message *proto.RequestMessage) bool {
 }
 
 func (s MutexNode) multicast() {
-	s.state = "WANTED"
-	s.responses = 0
+	s.changeState("WANTED")
+	responses = 0
 	for _, client := range s.clients {
 		message := proto.RequestMessage{
 			Port: s.port,
@@ -230,14 +229,19 @@ func (s MutexNode) multicast() {
 		go makeRequest(client, &message)
 	}
 	for {
-		if s.responses >= len(s.clients) {
+		if responses >= len(s.clients) {
 			break
 		}
 	}
-	s.state = "HELD"
+	s.changeState("HELD")
 	fmt.Println("ACCESING FILE...")
 	incrementFile()
-	s.state = "RELEASED"
+	s.changeState("RELEASED")
+}
+
+func (s MutexNode) changeState(newState string) {
+	s.state = newState
+	fmt.Println("The new state is now: " + newState)
 }
 
 func incrementFile() {
