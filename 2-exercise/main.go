@@ -20,7 +20,6 @@ type MutexNode struct {
 	proto.UnimplementedMutexNodeServer
 	port        string
 	clients     map[string]proto.MutexNodeClient
-	state       string
 	myRequests  []proto.MutexNodeClient
 	lamportTime uint64
 }
@@ -28,6 +27,7 @@ type MutexNode struct {
 var responsesLock sync.Mutex
 var reqeustLock sync.Mutex
 var responses int
+var state string
 
 func main() {
 	clientPort := os.Args[2]                            //The port of this node
@@ -38,11 +38,11 @@ func main() {
 	node := &MutexNode{
 		port:        clientPort,
 		clients:     make(map[string]proto.MutexNodeClient),
-		state:       "RELEASED",
 		myRequests:  make([]proto.MutexNodeClient, 0),
 		lamportTime: 0,
 	}
 
+	state = "RELEASED"
 	go node.start_server(clientPort) //Starting a server so that this node listen on the given port
 	fmt.Printf("Node listening on port %s\n", clientPort)
 	if len(os.Args) > 3 { //If the client isn't the starting node
@@ -87,7 +87,7 @@ func main() {
 	num := rand.Float32()
 	fmt.Println("Desired network size reached starting main sequence...")
 	for {
-		if node.state == "RELEASED" {
+		if state == "RELEASED" {
 			reqeustLock.Lock()
 			for _, client := range node.myRequests {
 				reply := proto.Reply{
@@ -171,8 +171,8 @@ func (s MutexNode) Request(context context.Context, message *proto.RequestMessag
 		fmt.Println(s.clients)
 		fmt.Printf("The port is %s for the nil client\n", message.Port)
 	}
-	fmt.Printf("Got request, my state is: %s\n", s.state)
-	if s.state == "HELD" || (s.state == "WANTED" && s.compare(message)) {
+	fmt.Printf("Got request, my state is: %s\n", state)
+	if state == "HELD" || (state == "WANTED" && s.compare(message)) {
 		fmt.Printf("Added to request to list, my port is:%s\n", s.port)
 		s.myRequests = append(s.myRequests, requestingClient)
 	} else {
@@ -240,7 +240,7 @@ func (s MutexNode) multicast() {
 }
 
 func (s MutexNode) changeState(newState string) {
-	s.state = newState
+	state = newState
 	fmt.Println("The new state is now: " + newState)
 }
 
