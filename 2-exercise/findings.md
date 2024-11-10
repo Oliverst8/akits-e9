@@ -1,2 +1,3 @@
 - It appears to work perfectly without Lamport timestamps. I think this is due to the hieracy of ports, being used as the comparison. In that case, the lamport timestamps are only neccesary to fulfill the Liveliness Criterion
-- The MutexNode passed around (known as "s") is not passed by pointer (what is that called? By object?). Changing this breaks the functionality.
+- The MutexNode passed around (known as "s") is not passed by pointer (ie. by value). Changing this breaks the functionality.
+- When the MutexNode is passed by value, the changes to its Lamport time are (unsurprisingly) unsaved. Changes are just made to the local value.
