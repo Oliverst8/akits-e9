@@ -46,7 +46,7 @@ func main() {
 	state = "RELEASED"
 	go node.start_server(clientPort) //Starting a server so that this node listen on the given port
 	node.lamportTime++
-	fmt.Printf("Node listening on port %s, at time: \n", clientPort, node.lamportTime)
+	fmt.Printf("Node listening on port %s, at time: %d\n", clientPort, node.lamportTime)
 	if len(os.Args) > 3 { //If the client isn't the starting node
 
 		joinOn := os.Args[3] //The port to send the join request to
@@ -114,7 +114,7 @@ func main() {
 	}
 }
 
-func (s MutexNode) start_server(port string) { // start up a new server and listen on the nodes port
+func (s *MutexNode) start_server(port string) { // start up a new server and listen on the nodes port
 	grpcServer := grpc.NewServer()
 	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
@@ -129,7 +129,7 @@ func (s MutexNode) start_server(port string) { // start up a new server and list
 	}
 }
 
-func (s MutexNode) start_client(port string) { // start up a new client for the node to send information through the given port
+func (s *MutexNode) start_client(port string) { // start up a new client for the node to send information through the given port
 	conn, err := grpc.NewClient("localhost:"+port, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		panic(err)
@@ -138,7 +138,7 @@ func (s MutexNode) start_client(port string) { // start up a new client for the 
 }
 
 // Join Called from client, to make a request to join the network
-func (s MutexNode) Join(context context.Context, message *proto.JoinMessage) (*proto.JoinResponse, error) {
+func (s *MutexNode) Join(context context.Context, message *proto.JoinMessage) (*proto.JoinResponse, error) {
 	//Sends a
 	var ports []string
 	for _, client := range s.clients {
@@ -162,7 +162,7 @@ func (s MutexNode) Join(context context.Context, message *proto.JoinMessage) (*p
 }
 
 // AddNode This function adds a client to the node so it can send information to the newly joined node
-func (s MutexNode) AddNode(context context.Context, message *proto.JoinMessage) (*proto.JoinMessage, error) {
+func (s *MutexNode) AddNode(context context.Context, message *proto.JoinMessage) (*proto.JoinMessage, error) {
 	port := message.Port
 	s.start_client(port)
 	return &proto.JoinMessage{
@@ -170,13 +170,13 @@ func (s MutexNode) AddNode(context context.Context, message *proto.JoinMessage) 
 	}, nil
 }
 
-func (s MutexNode) Request(context context.Context, message *proto.RequestMessage) (*proto.Empty, error) {
+func (s *MutexNode) Request(context context.Context, message *proto.RequestMessage) (*proto.Empty, error) {
 	requestingClient := s.clients[message.Port]
 	if requestingClient == nil {
 		fmt.Println(s.clients)
 		fmt.Printf("The port is %s for the nil client\n", message.Port)
 	}
-	fmt.Printf("Got request, my state is: %s\n", state)
+	fmt.Printf("Got request from %s, my state is: %s, time: %d\n", message.Port, state, s.lamportTime)
 	if state == "HELD" || (state == "WANTED" && s.compare(message)) {
 		fmt.Printf("Added to request to list, my port is:%s\n", s.port)
 		s.myRequests = append(s.myRequests, requestingClient)
@@ -194,7 +194,7 @@ func (s MutexNode) Request(context context.Context, message *proto.RequestMessag
 	return &proto.Empty{}, nil
 }
 
-func (s MutexNode) RespondToRequest(context context.Context, reply *proto.Reply) (*proto.Empty, error) {
+func (s *MutexNode) RespondToRequest(context context.Context, reply *proto.Reply) (*proto.Empty, error) {
 	fmt.Println("Got goahead")
 	responsesLock.Lock()
 	responses = 1 + responses
@@ -203,7 +203,7 @@ func (s MutexNode) RespondToRequest(context context.Context, reply *proto.Reply)
 	return &proto.Empty{}, nil
 }
 
-func (s MutexNode) compare(message *proto.RequestMessage) bool {
+func (s *MutexNode) compare(message *proto.RequestMessage) bool {
 	thisPort, err := strconv.Atoi(s.port)
 	if err != nil {
 		panic(err)
@@ -212,7 +212,7 @@ func (s MutexNode) compare(message *proto.RequestMessage) bool {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Entered compare")
+	fmt.Printf("Entered compare between my time: %d and their time: %d \n", s.lamportTime, message.Time)
 	if s.lamportTime < message.Time {
 		return true
 	}
@@ -223,7 +223,7 @@ func (s MutexNode) compare(message *proto.RequestMessage) bool {
 	return false
 }
 
-func (s MutexNode) multicast() {
+func (s *MutexNode) multicast() {
 	s.changeState("WANTED")
 	responses = 0
 	for _, client := range s.clients {
@@ -244,7 +244,7 @@ func (s MutexNode) multicast() {
 	s.changeState("RELEASED")
 }
 
-func (s MutexNode) changeState(newState string) {
+func (s *MutexNode) changeState(newState string) {
 	state = newState
 	fmt.Println("The new state is now: " + newState)
 }
@@ -294,7 +294,7 @@ func makeRequest(client proto.MutexNodeClient, message *proto.RequestMessage) {
 	}
 }
 
-func (s MutexNode) updateTime(time uint64) {
+func (s *MutexNode) updateTime(time uint64) {
 	if time > s.lamportTime {
 		s.lamportTime = time
 	}
