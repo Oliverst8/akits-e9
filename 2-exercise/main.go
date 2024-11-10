@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	proto "main/grpc"
 	"math/rand/v2"
 	"net"
@@ -13,6 +11,9 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // MutexNode Each node has a server to receive information and a list of clients to send information to all other nodes
@@ -30,8 +31,8 @@ var responses int
 var state string
 
 func main() {
+	desiredNetworkSize, err := strconv.Atoi(os.Args[1]) //The desired size of the network
 	clientPort := os.Args[2]                            //The port of this node
-	desiredNetworkSize, err := strconv.Atoi(os.Args[1]) //the desired size of the network
 	if err != nil {
 		panic(err)
 	}
@@ -44,7 +45,8 @@ func main() {
 
 	state = "RELEASED"
 	go node.start_server(clientPort) //Starting a server so that this node listen on the given port
-	fmt.Printf("Node listening on port %s\n", clientPort)
+	node.lamportTime++
+	fmt.Printf("Node listening on port %s, at time: \n", clientPort, node.lamportTime)
 	if len(os.Args) > 3 { //If the client isn't the starting node
 
 		joinOn := os.Args[3] //The port to send the join request to
@@ -55,6 +57,7 @@ func main() {
 			Port: clientPort,
 		}
 
+		node.lamportTime++
 		response, err := node.clients[joinOn].Join(context.Background(), &message) //Trying to join using the first node
 
 		if err != nil {
@@ -78,14 +81,15 @@ func main() {
 		// print only when changed
 		length := len(node.clients)
 		if length != prev {
-			fmt.Println(length)
+			fmt.Printf("%d clients at time: %d \n", length, node.lamportTime)
 			prev = length
 		}
 
 	}
 	time.Sleep(2 * time.Second)
 	num := rand.Float32()
-	fmt.Println("Desired network size reached starting main sequence...")
+	fmt.Print("Desired network size reached starting main sequence...")
+	fmt.Printf(" time: %d \n", node.lamportTime)
 	for {
 		if state == "RELEASED" {
 			reqeustLock.Lock()
@@ -102,7 +106,8 @@ func main() {
 			reqeustLock.Unlock()
 		}
 		if num < 0.01 {
-			fmt.Println("Start multicast...")
+			fmt.Print("Start multicast...")
+			fmt.Printf(" time: %d \n", node.lamportTime)
 			node.multicast()
 		}
 		num = rand.Float32()
@@ -287,4 +292,11 @@ func makeRequest(client proto.MutexNodeClient, message *proto.RequestMessage) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func (s MutexNode) updateTime(time uint64) {
+	if time > s.lamportTime {
+		s.lamportTime = time
+	}
+	s.lamportTime++
 }
