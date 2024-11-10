@@ -94,6 +94,7 @@ func main() {
 		if state == "RELEASED" {
 			reqeustLock.Lock()
 			for _, client := range node.myRequests {
+				fmt.Printf("Giving goahead to queued request from client \n")
 				reply := proto.Reply{
 					Success: true,
 					Time:    node.lamportTime,
@@ -103,6 +104,7 @@ func main() {
 					panic(err)
 				}
 			}
+			node.myRequests = nil
 			reqeustLock.Unlock()
 		}
 		if num < 0.01 {
@@ -171,6 +173,7 @@ func (s *MutexNode) AddNode(context context.Context, message *proto.JoinMessage)
 }
 
 func (s *MutexNode) Request(context context.Context, message *proto.RequestMessage) (*proto.Empty, error) {
+	s.updateTime(message.Time)
 	requestingClient := s.clients[message.Port]
 	if requestingClient == nil {
 		fmt.Println(s.clients)
@@ -181,11 +184,12 @@ func (s *MutexNode) Request(context context.Context, message *proto.RequestMessa
 		fmt.Printf("Added to request to list, my port is:%s\n", s.port)
 		s.myRequests = append(s.myRequests, requestingClient)
 	} else {
+		s.lamportTime++
 		reply := proto.Reply{
 			Success: true,
 			Time:    s.lamportTime,
 		}
-		fmt.Println("Giving go ahead to request")
+		fmt.Printf("Giving go ahead to request, at time: %d \n", s.lamportTime)
 		_, err := requestingClient.RespondToRequest(context, &reply)
 		if err != nil {
 			panic(err)
@@ -195,7 +199,8 @@ func (s *MutexNode) Request(context context.Context, message *proto.RequestMessa
 }
 
 func (s *MutexNode) RespondToRequest(context context.Context, reply *proto.Reply) (*proto.Empty, error) {
-	fmt.Println("Got goahead")
+	s.updateTime(reply.Time)
+	fmt.Printf("Got goahead from someone, at time: %d \n", reply.Time)
 	responsesLock.Lock()
 	responses = 1 + responses
 	fmt.Printf("Increased responses, new response: %d \n", responses)
@@ -223,7 +228,7 @@ func (s *MutexNode) compare(message *proto.RequestMessage) bool {
 	return false
 }
 
-func (s *MutexNode) multicast() {
+func (s MutexNode) multicast() {
 	s.changeState("WANTED")
 	responses = 0
 	for _, client := range s.clients {
