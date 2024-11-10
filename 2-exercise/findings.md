@@ -2,4 +2,4 @@
 - The MutexNode passed around (known as "s") is not passed by pointer (ie. by value). Changing this breaks the functionality.
 * * One of the problems caused by passing by pointer, was that the list of requests to respond to was never cleared. This can be easily fixed, but more problems are remain.
 - When the MutexNode is passed by value, the changes to its Lamport time are (unsurprisingly) unsaved. Changes are just made to the local value.
-
+- Now this is interesting! The append request in the Request function does not do anything when passing by value. And when making it do something, the program does not work. Curious. I guess I should just remove it, and enjoy the benefits.

@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	proto "main/grpc"
 	"math/rand/v2"
 	"net"
@@ -13,6 +11,9 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // MutexNode Each node has a server to receive information and a list of clients to send information to all other nodes
@@ -87,6 +88,7 @@ func main() {
 	num := rand.Float32()
 	fmt.Println("Desired network size reached starting main sequence...")
 	for {
+		fmt.Printf("Process currently at time: %d \n", node.lamportTime)
 		if state == "RELEASED" {
 			reqeustLock.Lock()
 			for _, client := range node.myRequests {
@@ -99,6 +101,7 @@ func main() {
 					panic(err)
 				}
 			}
+			node.myRequests = nil
 			reqeustLock.Unlock()
 		}
 		if num < 0.01 {
@@ -109,7 +112,7 @@ func main() {
 	}
 }
 
-func (s MutexNode) start_server(port string) { // start up a new server and listen on the nodes port
+func (s *MutexNode) start_server(port string) { // start up a new server and listen on the nodes port
 	grpcServer := grpc.NewServer()
 	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
@@ -165,7 +168,7 @@ func (s MutexNode) AddNode(context context.Context, message *proto.JoinMessage) 
 	}, nil
 }
 
-func (s MutexNode) Request(context context.Context, message *proto.RequestMessage) (*proto.Empty, error) {
+func (s *MutexNode) Request(context context.Context, message *proto.RequestMessage) (*proto.Empty, error) {
 	requestingClient := s.clients[message.Port]
 	if requestingClient == nil {
 		fmt.Println(s.clients)
@@ -174,7 +177,7 @@ func (s MutexNode) Request(context context.Context, message *proto.RequestMessag
 	fmt.Printf("Got request, my state is: %s\n", state)
 	if state == "HELD" || (state == "WANTED" && s.compare(message)) {
 		fmt.Printf("Added to request to list, my port is:%s\n", s.port)
-		s.myRequests = append(s.myRequests, requestingClient)
+		//s.myRequests = append(s.myRequests, requestingClient) REMOVED BECAUSE IT BROKE THE PROGRAM. See findings.md
 	} else {
 		reply := proto.Reply{
 			Success: true,
@@ -186,11 +189,13 @@ func (s MutexNode) Request(context context.Context, message *proto.RequestMessag
 			panic(err)
 		}
 	}
+	//s.updateTime(message.Time)
 	return &proto.Empty{}, nil
 }
 
-func (s MutexNode) RespondToRequest(context context.Context, reply *proto.Reply) (*proto.Empty, error) {
-	fmt.Println("Got goahead")
+func (s *MutexNode) RespondToRequest(context context.Context, reply *proto.Reply) (*proto.Empty, error) {
+	//s.updateTime(reply.Time)
+	fmt.Printf("Got goahead at time %d \n", s.lamportTime)
 	responsesLock.Lock()
 	responses = 1 + responses
 	fmt.Printf("Increased responses, new response: %d \n", responses)
@@ -287,4 +292,11 @@ func makeRequest(client proto.MutexNodeClient, message *proto.RequestMessage) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func (s *MutexNode) updateTime(timeStamp uint64) {
+	if timeStamp > s.lamportTime {
+		s.lamportTime = timeStamp
+	}
+	s.lamportTime++
 }
