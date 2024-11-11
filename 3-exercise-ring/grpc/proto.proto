@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+option go_package = "9-week/3-exercise-ring/grpc/proto";
+
+message Empty{}
+
+service MutexNodeVTwo {
+  rpc SendToken(Empty) returns (Empty);
+}
