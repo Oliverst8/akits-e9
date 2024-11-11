@@ -212,12 +212,12 @@ func (s MutexNode) compare(message *proto.RequestMessage) bool {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Entered compare")
+	fmt.Printf("Entered compare between my time %d and theirs %d \n", s.lamportTime, message.Time)
 	if s.lamportTime < message.Time {
 		return true
 	}
 	if s.lamportTime == message.Time && thisPort < thatPort {
-		fmt.Printf("My port is smaller\n\t- My Port: %d\n\t- Their Port:%d", thisPort, thatPort)
+		fmt.Printf("My port is smaller\n\t- My Port: %d\n\t- Their Port:%d \n", thisPort, thatPort)
 		return true
 	}
 	return false
