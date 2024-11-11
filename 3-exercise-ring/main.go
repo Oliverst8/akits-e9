@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"log"
 	proto "main/grpc"
 	"math/rand/v2"
 	"net"
@@ -60,17 +61,17 @@ func main() {
 
 	for {
 		if !wantAccess {
-			if num < 0.03 && i < 10000 {
+			if num < 0.03 && i < 100 {
+				fmt.Println("Requesting access")
 				wantAccess = true
 			} else {
-				fmt.Printf("num: %d\n", num)
 				num = rand.Float32()
 			}
 		}
 
 		if hasToken {
 			if wantAccess {
-				fmt.Printf("I got access, i: %d\n", i)
+				log.Printf("I got access, i: %d\n", i)
 				incrementFile()
 				wantAccess = false
 				i++
@@ -102,6 +103,7 @@ func checkforToken() {
 
 func (s MutexNode) SendToken(ctx context.Context, empty *proto.Empty) (*proto.Empty, error) {
 	hasToken = true
+	fmt.Println("I got access")
 	message := proto.Empty{}
 	return &message, nil
 }
