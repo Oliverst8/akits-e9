@@ -18,16 +18,16 @@ import (
 // MutexNode Each node has a server to receive information and a list of clients to send information to all other nodes
 type MutexNode struct {
 	proto.UnimplementedMutexNodeServer
-	port        string
-	clients     map[string]proto.MutexNodeClient
-	myRequests  []proto.MutexNodeClient
-	lamportTime uint64
+	port    string
+	clients map[string]proto.MutexNodeClient
 }
 
 var responsesLock sync.Mutex
 var reqeustLock sync.Mutex
 var responses int
 var state string
+var myRequests []proto.MutexNodeClient
+var lamportTime uint64
 
 func main() {
 	clientPort := os.Args[2]                            //The port of this node
@@ -36,12 +36,12 @@ func main() {
 		panic(err)
 	}
 	node := &MutexNode{
-		port:        clientPort,
-		clients:     make(map[string]proto.MutexNodeClient),
-		myRequests:  make([]proto.MutexNodeClient, 0),
-		lamportTime: 0,
+		port:    clientPort,
+		clients: make(map[string]proto.MutexNodeClient),
 	}
-
+	
+	myRequests = make([]proto.MutexNodeClient, 0)
+	lamportTime = 0
 	state = "RELEASED"
 	go node.start_server(clientPort) //Starting a server so that this node listen on the given port
 	fmt.Printf("Node listening on port %s\n", clientPort)
@@ -89,16 +89,17 @@ func main() {
 	for {
 		if state == "RELEASED" {
 			reqeustLock.Lock()
-			for _, client := range node.myRequests {
+			for _, client := range myRequests {
 				reply := proto.Reply{
 					Success: true,
-					Time:    node.lamportTime,
+					Time:    lamportTime,
 				}
 				_, err = client.RespondToRequest(context.Background(), &reply)
 				if err != nil {
 					panic(err)
 				}
 			}
+			myRequests = make([]proto.MutexNodeClient, 0)
 			reqeustLock.Unlock()
 		}
 		if num < 0.01 {
@@ -151,7 +152,7 @@ func (s MutexNode) Join(context context.Context, message *proto.JoinMessage) (*p
 	reply := proto.JoinResponse{
 		Ports:   ports,
 		Success: true,
-		Time:    s.lamportTime,
+		Time:    lamportTime,
 	}
 	return &reply, nil
 }
@@ -174,13 +175,13 @@ func (s MutexNode) Request(context context.Context, message *proto.RequestMessag
 	fmt.Printf("Got request, my state is: %s\n", state)
 	if state == "HELD" || (state == "WANTED" && s.compare(message)) {
 		fmt.Printf("Added to request to list, my port is:%s\n", s.port)
-		s.myRequests = append(s.myRequests, requestingClient)
+		myRequests = append(myRequests, requestingClient)
 	} else {
 		reply := proto.Reply{
 			Success: true,
-			Time:    s.lamportTime,
+			Time:    lamportTime,
 		}
-		fmt.Println("Giving go ahead to request")
+		fmt.Printf("Giving go ahead to request for port %s\n", message.Port)
 		_, err := requestingClient.RespondToRequest(context, &reply)
 		if err != nil {
 			panic(err)
@@ -208,11 +209,13 @@ func (s MutexNode) compare(message *proto.RequestMessage) bool {
 		panic(err)
 	}
 	fmt.Println("Entered compare")
-	if s.lamportTime < message.Time {
-		return true
-	}
-	if s.lamportTime == message.Time && thisPort < thatPort {
-		fmt.Printf("My port is smaller\n\t- My Port: %d\n\t- Their Port:%d", thisPort, thatPort)
+	//if lamportTime < message.Time {
+	//	return true
+	//}
+	//if lamportTime == message.Time && thisPort < thatPort {
+	if thisPort < thatPort {
+		fmt.Printf("My port is smaller\n\t- My Port: %d\n\t- Their Port:%d\n", thisPort, thatPort)
+		fmt.Printf("My response count: %d\n", responses)
 		return true
 	}
 	return false
@@ -220,11 +223,14 @@ func (s MutexNode) compare(message *proto.RequestMessage) bool {
 
 func (s MutexNode) multicast() {
 	s.changeState("WANTED")
+	if responses != 3 && responses != 0 {
+		panic(fmt.Sprintf("response not 3 or 0, my repsonse is %d", responses))
+	}
 	responses = 0
 	for _, client := range s.clients {
 		message := proto.RequestMessage{
 			Port: s.port,
-			Time: s.lamportTime,
+			Time: lamportTime,
 		}
 		go makeRequest(client, &message)
 	}
