@@ -1,32 +1,9 @@
 syntax = "proto3";
 
-option go_package = "9-week/grpc/proto";
-
-message RequestMessage {
-  uint64 time = 1;
-  string port = 2;
-}
-
-message JoinMessage {
-  string port = 1;
-}
-
-message Reply {
-  bool success = 1;
-  uint64 time = 2;
-}
-
-message JoinResponse {
-  bool success = 1;
-  uint64 time = 2;
-  repeated string ports = 3;
-}
+option go_package = "9-week/3-exercise-ring/grpc/proto";
 
 message Empty{}
 
-service MutexNode {
-  rpc Join(JoinMessage) returns (JoinResponse);
-  rpc Request(RequestMessage) returns (Empty);
-  rpc RespondToRequest(Reply) returns (Empty);
-  rpc AddNode(JoinMessage) returns (JoinMessage);
+service MutexNodeVTwo {
+  rpc SendToken(Empty) returns (Empty);
 }
