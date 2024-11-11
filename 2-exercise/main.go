@@ -169,7 +169,6 @@ func (s MutexNode) AddNode(context context.Context, message *proto.JoinMessage) 
 }
 
 func (s MutexNode) Request(context context.Context, message *proto.RequestMessage) (*proto.Empty, error) {
-	updateTime(message.Time)
 	requestingClient := s.clients[message.Port]
 	if requestingClient == nil {
 		fmt.Println(s.clients)
