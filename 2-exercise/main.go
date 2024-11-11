@@ -20,7 +20,6 @@ type MutexNode struct {
 	proto.UnimplementedMutexNodeServer
 	port        string
 	clients     map[string]proto.MutexNodeClient
-	myRequests  []proto.MutexNodeClient
 	lamportTime uint64
 }
 
@@ -28,6 +27,8 @@ var responsesLock sync.Mutex
 var reqeustLock sync.Mutex
 var responses int
 var state string
+
+var myRequests []proto.MutexNodeClient
 
 func main() {
 	clientPort := os.Args[2]                            //The port of this node
@@ -38,10 +39,10 @@ func main() {
 	node := &MutexNode{
 		port:        clientPort,
 		clients:     make(map[string]proto.MutexNodeClient),
-		myRequests:  make([]proto.MutexNodeClient, 0),
 		lamportTime: 0,
 	}
 
+	myRequests = make([]proto.MutexNodeClient, 0)
 	state = "RELEASED"
 	go node.start_server(clientPort) //Starting a server so that this node listen on the given port
 	fmt.Printf("Node listening on port %s\n", clientPort)
@@ -89,7 +90,7 @@ func main() {
 	for {
 		if state == "RELEASED" {
 			reqeustLock.Lock()
-			for _, client := range node.myRequests {
+			for _, client := range myRequests {
 				reply := proto.Reply{
 					Success: true,
 					Time:    node.lamportTime,
@@ -99,6 +100,7 @@ func main() {
 					panic(err)
 				}
 			}
+			myRequests = make([]proto.MutexNodeClient, 0)
 			reqeustLock.Unlock()
 		}
 		if num < 0.01 {
@@ -174,13 +176,15 @@ func (s MutexNode) Request(context context.Context, message *proto.RequestMessag
 	fmt.Printf("Got request, my state is: %s\n", state)
 	if state == "HELD" || (state == "WANTED" && s.compare(message)) {
 		fmt.Printf("Added to request to list, my port is:%s\n", s.port)
-		s.myRequests = append(s.myRequests, requestingClient)
+		reqeustLock.Lock()
+		myRequests = append(myRequests, requestingClient)
+		reqeustLock.Unlock()
 	} else {
 		reply := proto.Reply{
 			Success: true,
 			Time:    s.lamportTime,
 		}
-		fmt.Println("Giving go ahead to request")
+		fmt.Printf("Giving go ahead to request to the port: %s\n", message.Port)
 		_, err := requestingClient.RespondToRequest(context, &reply)
 		if err != nil {
 			panic(err)
@@ -288,3 +292,8 @@ func makeRequest(client proto.MutexNodeClient, message *proto.RequestMessage) {
 		panic(err)
 	}
 }
+
+func updateTime(time uint64) {
+	if time > lamportTime {
+		lamportTime = time
+	}
